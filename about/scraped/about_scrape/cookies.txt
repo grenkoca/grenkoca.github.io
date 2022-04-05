@@ -1,0 +1,5 @@
+# HTTrack Website Copier Cookie File
+# This file format is compatible with Netscape cookies
+.adhamdannaway.com	TRUE	/	FALSE	1999999999	__cfduid	da6916deedcad846047281018b187842a1588619949
+www.adhamdannaway.com	TRUE	/	FALSE	1999999999	SameSite	Lax
+

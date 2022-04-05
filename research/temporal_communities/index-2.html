@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+  
+<!-- Mirrored from ulfaslak.com/research/temporal_communities/index.html by HTTrack Website Copier/3.x [XR&CO'2014], Thu, 23 Jan 2020 19:04:32 GMT -->
+<!-- Added by HTTrack --><meta http-equiv="content-type" content="text/html;charset=utf-8" /><!-- /Added by HTTrack -->
+<head>
+    <meta charset="utf-8">
+    <title>DTU Communities</title>
+
+    <script src="libs/d3.min.js"></script>
+    <script src="libs/jquery.js"></script>
+    <script src="libs/d3-tip.js"></script>
+    <script src="libs/bootstrap/js/tab.js"></script>
+    <script src="libs/bootstrap/js/slider.js"></script>
+    <script src='libs/spin.min.js'></script> 
+    
+    <link href="libs/bootstrap/css/bootstrap.min.css" rel="stylesheet">
+    <link href="libs/bootstrap/css/bootstrap-slider.css" rel="stylesheet">
+    <link rel="stylesheet" type="text/css" href="viz.css">
+
+  </head>
+  <body>
+
+<div style="width: 100%; overflow: hidden;">
+
+    <div id='w1'></div>
+    <div id='w2'></div>
+
+    <div id='w3'>
+
+        <!-- Slider (smallest allowed group size) -->
+        <input id="ex6" data-slider-id='ex6Slider' type="text" data-slider-min="2" data-slider-max="10" data-slider-step="1" data-slider-value="5"/>
+
+        <!-- Radio buttons (day of week) -->
+        <div class="btn-group btn-group-justified" id="weekdayButtonGroup" data-toggle="buttons">
+            <label class="btn btn-default active">
+                <input type="radio" id="datasetMon" name="quality[25]" checked="checked" value="1" /> Mon
+            </label> 
+            <label class="btn btn-default">
+                <input type="radio" id="datasetTue" name="quality[25]" value="2" /> Tue
+            </label> 
+            <label class="btn btn-default">
+                <input type="radio" id="datasetWed" name="quality[25]" value="3" /> Wed
+            </label> 
+            <label class="btn btn-default">
+                <input type="radio" id="datasetThu" name="quality[25]" value="4" /> Thu
+            </label> 
+            <label class="btn btn-default">
+                <input type="radio" id="datasetFri" name="quality[25]" value="5" /> Fri
+            </label>
+        </div>
+
+        <!-- Radio buttons (clustering method) -->
+        <div class="btn-group btn-group-justified" id="methodButtonGroup" data-toggle="buttons">
+            <label class="btn btn-default active">
+                <input type="radio" id="NFC" name="quality[25]" checked="checked" value="1" /> Neighborhood flow coupling
+            </label> 
+            <label class="btn btn-default">
+                <input type="radio" id="FC" name="quality[25]" value="2" /> Full coupling
+            </label> 
+        </div>
+
+        <!-- Radio buttons (dataset) -->
+        <div class="btn-group btn-group-justified" id="datasetButtonGroup" data-toggle="buttons">
+            <label class="btn btn-default active">
+                <input type="radio" id="sendtu" name="quality[25]" checked="checked" value="1" /> University
+            </label> 
+            <label class="btn btn-default">
+                <input type="radio" id="workplace" name="quality[25]" value="2" /> Workplace
+            </label> 
+            <label class="btn btn-default">
+                <input type="radio" id="fishes" name="quality[25]" value="2" /> Fishes
+            </label> 
+        </div>
+
+    </div> <!-- w3 end -->
+
+    <div id='w4'>
+
+        <!-- Nav tabs -->
+        <ul class="nav nav-tabs" role="tablist">
+            <li role="presentation" class="active"><a href="#home" aria-controls="home" role="tab" data-toggle="tab">Guide</a></li>
+            <li role="presentation"><a href="#profile" aria-controls="profile" role="tab" data-toggle="tab">About</a></li>
+        </ul>
+
+        <!-- Tab panes -->
+        <div class="tab-content">
+            <div role="tabpanel" class="tab-pane active" id="home">
+
+                <table class="table table-striped"> 
+                    <thead> 
+                        <tr> 
+                            <th>Key</th> 
+                            <th>Description</th> 
+                        </tr> 
+                    </thead> 
+                    <tbody> 
+                        <tr> 
+                            <th scope="row"><p>&nbsp;&nbsp;&nbsp;&uarr;</p></th> 
+                            <td>Next time step</td> 
+                        </tr> 
+                        <tr> 
+                            <th scope="row"><p>&nbsp;&nbsp;&nbsp;&darr;</p></th> 
+                            <td>Previous time step</td> 
+                        </tr> 
+                        <tr> 
+                            <th scope="row"><p><kbd>shift</kbd> + &uarr;/&darr;</p></th> 
+                            <td>Slow time step</td> 
+                        </tr> 
+                        <tr> 
+                            <th scope="row"><p><kbd>alt</kbd></p></th> 
+                            <td>Toggle person Ids</td> 
+                        </tr> 
+                        <tr> 
+                            <th scope="row"><p><kbd>esc</kbd></p></th> 
+                            <td>Revert to normal mode</td> 
+                        </tr> 
+                    </tbody> 
+                </table>
+
+                <p class='sidebar-text'>
+                    <b>The long strips</b> each represent a community and its size over time.
+                    When you hover and click a community, others vanish if they have no members in common.
+                    You can inspect similarity by clicking one community and hovering another.
+                    Doubling clicking nodes on the graph also works.
+                    <br><br>
+                    <b>The graph</b> visualizes the network in a 10-minute time-bin, corresponding to the position of horizontal blue bar in the left panel.
+                    By stepping through time (using the <kbd>up</kbd> and <kbd>down</kbd> arrow keys), the network updates to visualize an adjacent time-bin.
+                    You zoom in and out by scrolling on the graph.
+                    <br><br>
+                    <b>The slider</b> controls the minimum size of groups that are displayed.
+                    If set to 5, groups of maximum size lower than 5 are not shown.
+                    <br><br>
+                    <b>The buttons</b> control various things.
+                    <u>The first row</u> controls the day of the week.
+                    If a community exists on two seperate days, it will have the same horizontal position on both days.
+                    <u>The second row</u> of buttons controls which interlayer coupling sheme was used for community detection [<a href="#" target="_blank">1</a>].
+                    <u>The third row</u> changes the dataset [<a href="http://journals.plos.org/plosone/article?id=10.1371/journal.pone.0095978" target="_blank">2</a>, <a href="http://www.sociopatterns.org/datasets/contacts-in-a-workplace/" target="_blank">3</a>].
+                </p>
+
+                
+                
+            </div>
+            <div role="tabpanel" class="tab-pane" id="profile">
+                <br>
+                
+
+                <p class='sidebar-text'>
+                    This is a visualization of the temporal structure of communities in dynamical face-to-face networks. Each node in the graph represents a person, and each link represents an encounter. The graph represents an aggregate of all connections that occur within a 10 minute window visualized by the blue ribbon, initiated at 9:00 - 9:10 AM. The left panel visualizes the temporal evolution of each community over a single day (width corresponding to size, horizontal position arbitrary, colors reused at random).
+
+                    <br><br>
+                    By using the arrow keys, you can change the window of interactions that the graph shows. You can also click on a timelabel to change the time. Using these controls it is possible to visualize how groups grow, vanish, split, merge and exchange members.
+
+                    <br><br>
+                    Hovering a community causes non-overlapping communities to vanish. If you click on one of them, a tooltip displays some stats about the group. Once a community is highlighted you can hover over other communities to get a measure of similarity and number of shared members.
+
+                    <br><br>
+                    At default, the visualization displays the network on a Monday. You can change this by clicking one the weekday buttons. Doing so will display one of the other days. It is possible to notice that certain communities occur each day, with a similar temporal pattern.
+                    
+                    <br><br>
+                    This is an interactive version of Fig. 7 in <a href="https://arxiv.org/abs/1711.07649">Aslak, Ulf, et. al. "Constrained information flows in temporal networks reveal intermittent communities." arXiv preprint arXiv:1711.07649 (2017)</a>. Refer to the paper for further details. Refer to <a href="http://www.mapequation.org/code.html">www.mapequation.org</a> for an implementation of the community detection algorithm. Project code is available on <a href="https://github.com/ulfaslak/InfomapSensibleDTU/tree/master/Visualisation">Github</a>.
+                </p>
+            </div>
+        </div>
+    </div> <!-- w3 end -->
+</div>
+
+<script type="text/javascript">
+$('#myTabs a').click(function (e) {
+  e.preventDefault()
+  $(this).tab('show')
+})
+</script>
+
+<script src="viz.js"></script>
+    
+  </body>
+
+<!-- Mirrored from ulfaslak.com/research/temporal_communities/index.html by HTTrack Website Copier/3.x [XR&CO'2014], Thu, 23 Jan 2020 19:04:42 GMT -->
+</html>

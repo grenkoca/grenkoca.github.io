@@ -1,0 +1,91 @@
+<html>
+  
+<!-- Mirrored from ulfaslak.com/works/netwulf.html by HTTrack Website Copier/3.x [XR&CO'2014], Thu, 23 Jan 2020 19:04:24 GMT -->
+<!-- Added by HTTrack --><meta http-equiv="content-type" content="text/html;charset=utf-8" /><!-- /Added by HTTrack -->
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1.0">
+      <title>Ulf Aslak / works / faceworks</title>
+    <meta name="description" content="PhD student / physicist / data scientist">
+    <link rel="stylesheet" href="../assets/css/main.css"/>
+  </head>
+
+  <body>
+  	<!-- Header -->
+    <header class="header wrap wide" role="banner">
+      <div class="grid">
+        <div class="branding column">
+          <a href="../index-2.html" rel="home">Ulf Aslak</a>
+        </div>
+
+        <nav class="navigation column" role="navigation">
+          <ul class="menu">
+            <li class="menu-item">
+              <a href="../about.html">About</a>
+            </li>
+            <li class="menu-item">
+              <a href="../blog.html">Blog</a>
+            </li>
+            <li class="menu-item">
+              <a href="../files/cv_ulf_en.pdf">CV</a>
+            </li>
+            <li class="menu-item">
+              <a href="https://github.com/ulfaslak">Codes</a>
+            </li>
+            <li class="menu-item">
+              <a href="https://scholar.google.com/citations?user=bN8pKTIAAAAJ&amp;hl=da&amp;oi=ao" target="_blank">Publications</a>
+            </li>
+            <li class="menu-item">
+              <a href="../vent.html" target="_blank">Vent</a>
+            </li>
+          </ul>
+        </nav>
+      </div>
+    </header>
+
+    <!-- Content -->
+    <header class="wrap">
+      <h1><kbd>netwulf</kbd>: interactive network viz</h1>
+      <p><em>2018</em></p>
+    </header>
+    
+    <div class="text wrap">  
+      <p>I was simply annoyed that <strong>network visualization in Python was such a horrible thing to do</strong>. And it felt even more frustrating, given the vast number of researchers out there doing research in networks using Python. After endless Googling phrases like "d3 network python" and "networkx visualize d3", I figured I would <strong>write a small webapp</strong> where I could upload a node-link graph in JSON format produced by networkx, and visualize the network using canvas and d3. <a href="network_styling_with_d3/index.html"><br><br>So I did just that.</a></p>
+
+      <p>Initially, I didn't actually make the thing work directly from the Python console, because it felt too cumbersome. But luckly there's awesome people out there that will pick up where you leave off and take things to the next level. <a href="http://benmaier.org/">Benjamin Maier</a> whom I met when I visited <a href="http://rocs.hu-berlin.de/">Dirk Brockmann's lab</a> wrote <strong>a Python API to my web app</strong> called 'Netwulf'. The name was his idea. AND IT ROCKS. Now I can simply take a <em>networkx.Graph</em> and launch it locally as an awesome interactive visualization like:
+        <pre>
+        <code>
+          from netwulf import visualize
+          visulize(G)
+          # new browser window opens
+        </code>
+        </pre>
+
+        <figure>
+          <img src="https://netwulf.readthedocs.io/en/latest/_images/random_partition_graph.png" alt="netwulf_example">
+        </figure>
+
+      It's that easy! Install it with pip (<em>pip instal netwulf</em>). Check out the <a href="https://github.com/benmaier/netwulf/">code on Github</a> and <a href="https://netwulf.readthedocs.io/en/latest/">read the docs</a>. And if you use this software in your research, please <a href="https://joss.theoj.org/papers/3a22c963a45dbddc8501a4b5ef4b2bf6">cite our paper</a>!
+      </p>
+
+    </div>
+
+
+
+    <!-- Footer -->
+   	<footer class="footer cf" role="contentinfo">
+	    <div class="wrap wide">
+	      <p class="footer-copyright">© 2010–2020 Ulf Aslak | Copenhagen, Denmark</p>
+	    </div>
+  	</footer>
+
+    <!-- Google Analytics. -->
+    <script>
+      window.ga = function () { ga.q.push(arguments) }; ga.q = []; ga.l = +new Date;
+      ga('create', 'UA-124193587-1', 'auto'); ga('send', 'pageview')
+    </script>
+    <script src="https://www.google-analytics.com/analytics.js" async defer></script>
+  </body>
+
+<!-- Mirrored from ulfaslak.com/works/netwulf.html by HTTrack Website Copier/3.x [XR&CO'2014], Thu, 23 Jan 2020 19:04:24 GMT -->
+</html>
