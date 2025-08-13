@@ -1352,6 +1352,11 @@ height:100%;width:100%;-webkit-transform:rotate(30deg);-moz-transform:rotate(30d
   margin: auto;
 }
 
+figure {
+  text-align: center;
+  margin: 2rem auto;
+}
+
 #animation {
   display: block;
   margin: auto;
