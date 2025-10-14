@@ -252,15 +252,15 @@ const COMETVisualization = () => {
         <input
           type="range"
           min="0"
-          max="50"
+          max="100"
           value={clonality}
           onChange={(e) => setClonality(Number(e.target.value))}
           className="w-full h-2 bg-blue-200 rounded-lg appearance-none cursor-pointer"
         />
         <div className="flex justify-between text-xs text-gray-500 mt-1">
           <span>No CH (0%)</span>
-          <span>Moderate CH (25%)</span>
-          <span>High CH (50%)</span>
+          <span>Moderate CH (50%)</span>
+          <span>High CH (100%)</span>
         </div>
       </div>
 
