@@ -633,8 +633,11 @@ const COMETVisualization = () => {
                 <div className="text-sm font-mono">
                   Predicted VAF = 195 × COMET_score - 18.7
                 </div>
+                <p className="text-sm text-gray-600 mt-2">
+                  Note: since variants detected in sequencing are heterozygous, the VAF will be ~50% of the expanded clone frequency.
+                </p>
                 <p className="text-xs text-gray-600 mt-2">
-                  (Calibrated using mixed-effects regression on training data)
+                  (Calibrated using mixed-effects regression on training data.)
                 </p>
               </div>
             </div>
