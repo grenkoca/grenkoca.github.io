@@ -258,7 +258,7 @@ const COMETVisualization = () => {
         <div className="w-full bg-gray-200 rounded-full h-2">
           <div
             className="bg-blue-500 h-2 rounded-full transition-all duration-300"
-            style={{ width: `${((step + 1) / steps.length) * 100}%` }}
+            style={{ width: `${((step) / (steps.length -1)) * 100}%` }}
           />
         </div>
       </div>
