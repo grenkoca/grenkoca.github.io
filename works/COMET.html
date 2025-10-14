@@ -22,7 +22,7 @@ const gaussianKernel = (x, xi, bandwidth) => {
 };
 
 // Calculate KDE for a set of data points
-const calculateKDE = (data, bandwidth = 0.05, numPoints = 100) => {
+const calculateKDE = (data, bandwidth = 0.05, numPoints = 100, normalize = true) => {
   const min = 0;
   const max = 1;
   const step = (max - min) / numPoints;
@@ -40,9 +40,13 @@ const calculateKDE = (data, bandwidth = 0.05, numPoints = 100) => {
     kdePoints.push({ x, density });
   }
 
-  // Normalize to fit in display
-  const maxDensity = Math.max(...kdePoints.map(p => p.density));
-  return kdePoints.map(p => ({ x: p.x, density: p.density / maxDensity }));
+  if (normalize) {
+    // Normalize to fit in display
+    const maxDensity = Math.max(...kdePoints.map(p => p.density));
+    return kdePoints.map(p => ({ x: p.x, density: p.density / maxDensity }));
+  }
+
+  return kdePoints;
 };
 
 // Simple icon components
@@ -172,10 +176,24 @@ const COMETVisualization = () => {
     const mu = assignedCpGs.filter(c => c.assigned === 'MU').map(c => c.value);
     const mm = assignedCpGs.filter(c => c.assigned === 'MM').map(c => c.value);
 
+    // Calculate raw KDEs without normalization
+    const uuKDE = uu.length > 0 ? calculateKDE(uu, 0.05, 100, false) : [];
+    const muKDE = mu.length > 0 ? calculateKDE(mu, 0.05, 100, false) : [];
+    const mmKDE = mm.length > 0 ? calculateKDE(mm, 0.05, 100, false) : [];
+
+    // Find global max density across all states for consistent scaling
+    const allDensities = [
+      ...uuKDE.map(p => p.density),
+      ...muKDE.map(p => p.density),
+      ...mmKDE.map(p => p.density)
+    ];
+    const globalMax = Math.max(...allDensities, 1e-10);
+
+    // Scale by number of assignments to make cumulative height proportional
     return {
-      uu: uu.length > 0 ? calculateKDE(uu, 0.05, 100) : [],
-      mu: mu.length > 0 ? calculateKDE(mu, 0.05, 100) : [],
-      mm: mm.length > 0 ? calculateKDE(mm, 0.05, 100) : []
+      uu: uuKDE.map(p => ({ x: p.x, density: p.density / globalMax, count: uu.length })),
+      mu: muKDE.map(p => ({ x: p.x, density: p.density / globalMax, count: mu.length })),
+      mm: mmKDE.map(p => ({ x: p.x, density: p.density / globalMax, count: mm.length }))
     };
   }, [assignedCpGs]);
 
@@ -382,12 +400,13 @@ const COMETVisualization = () => {
                 <text x="300" y="220" fontSize="12" textAnchor="middle">0.5</text>
                 <text x="550" y="220" fontSize="12" textAnchor="middle">1.0</text>
 
-                {/* KDE curves for each state */}
+                {/* KDE curves for each state - height proportional to count */}
                 {kdeByState.uu.length > 0 && (
                   <path
                     d={kdeByState.uu.map((point, i) => {
                       const x = 50 + point.x * 500;
-                      const y = 200 - point.density * 80;
+                      const scale = point.count; // Scale by number of assignments
+                      const y = 200 - point.density * scale * 0.8;
                       return `${i === 0 ? 'M' : 'L'} ${x} ${y}`;
                     }).join(' ')}
                     fill="none"
@@ -400,7 +419,8 @@ const COMETVisualization = () => {
                   <path
                     d={kdeByState.mu.map((point, i) => {
                       const x = 50 + point.x * 500;
-                      const y = 200 - point.density * 80;
+                      const scale = point.count; // Scale by number of assignments
+                      const y = 200 - point.density * scale * 0.8;
                       return `${i === 0 ? 'M' : 'L'} ${x} ${y}`;
                     }).join(' ')}
                     fill="none"
@@ -413,7 +433,8 @@ const COMETVisualization = () => {
                   <path
                     d={kdeByState.mm.map((point, i) => {
                       const x = 50 + point.x * 500;
-                      const y = 200 - point.density * 80;
+                      const scale = point.count; // Scale by number of assignments
+                      const y = 200 - point.density * scale * 0.8;
                       return `${i === 0 ? 'M' : 'L'} ${x} ${y}`;
                     }).join(' ')}
                     fill="none"
@@ -456,7 +477,7 @@ const COMETVisualization = () => {
                 </div>
               </div>
               <div className="text-xs text-gray-600">
-                Colored curves show the kernel density estimates for each assigned state.
+                Colored curves show the kernel density estimates for each assigned state. The height of each KDE is proportional to the number of CpGs assigned to that state.
               </div>
             </div>
           </div>
