@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>COMET Algorithm Interactive Demo</title>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body>
+    <div id="root"></div>
+    
+    <script type="text/babel">
+const { useState } = React;
+
+// Simple icon components
+const ChevronLeft = ({ size }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <polyline points="15 18 9 12 15 6"></polyline>
+  </svg>
+);
+
+const ChevronRight = ({ size }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <polyline points="9 18 15 12 9 6"></polyline>
+  </svg>
+);
+
+const RotateCcw = ({ size }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <polyline points="1 4 1 10 7 10"></polyline>
+    <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path>
+  </svg>
+);
+
+const COMETVisualization = () => {
+  const [step, setStep] = useState(0);
+  const [clonality, setClonality] = useState(30);
+  
+  const meanMethylation = 0.3;
+  
+  // Hardy-Weinberg proportions
+  const p = meanMethylation;
+  const hwePropMM = p * p;
+  const hwePropMU = 2 * p * (1 - p);
+  const hwePropUU = (1 - p) * (1 - p);
+  
+  // Generate example CpGs
+  const generateCpGs = (clonalityPercent) => {
+    const clonalFraction = clonalityPercent / 100;
+    const cpgs = [];
+    
+    // Simulate 100 CpGs
+    for (let i = 0; i < 100; i++) {
+      const random = Math.random();
+      let originalState, targetValue;
+      
+      // Assign states based on HWE
+      if (random < hwePropUU) {
+        originalState = 'UU';
+        targetValue = 0;
+      } else if (random < hwePropUU + hwePropMU) {
+        originalState = 'MU';
+        targetValue = 0.5;
+      } else {
+        originalState = 'MM';
+        targetValue = 1.0;
+      }
+      
+      // Add noise
+      const noise = (Math.random() - 0.5) * 0.1;
+      const observedValue = p + (targetValue - p) * clonalFraction + noise;
+      const clampedValue = Math.max(0, Math.min(1, observedValue));
+      
+      cpgs.push({
+        id: i,
+        state: originalState,
+        value: clampedValue,
+        target: targetValue
+      });
+    }
+    
+    return cpgs;
+  };
+  
+  const cpgs = generateCpGs(clonality);
+  
+  // Assign CpGs to peaks based on closest value
+  const assignedCpGs = cpgs.map(cpg => {
+    const distances = [
+      Math.abs(cpg.value - 0),
+      Math.abs(cpg.value - 0.5),
+      Math.abs(cpg.value - 1.0)
+    ];
+    const minDist = Math.min(...distances);
+    const assignment = distances.indexOf(minDist) === 0 ? 'UU' : 
+                      distances.indexOf(minDist) === 1 ? 'MU' : 'MM';
+    return { ...cpg, assigned: assignment };
+  });
+  
+  // Calculate expected counts
+  const totalCpGs = cpgs.length;
+  const expectedUU = Math.round(totalCpGs * hwePropUU);
+  const expectedMU = Math.round(totalCpGs * hwePropMU);
+  const expectedMM = Math.round(totalCpGs * hwePropMM);
+  
+  // Calculate VAF
+  const calculateVAF = () => {
+    let vafSum = 0;
+    let count = 0;
+    
+    assignedCpGs.forEach(cpg => {
+      if (cpg.assigned === 'MM') {
+        const vaf = (cpg.value - p) / (2 * hwePropUU + hwePropMU);
+        vafSum += vaf;
+        count++;
+      } else if (cpg.assigned === 'UU') {
+        const vaf = (p - cpg.value) / (2 * hwePropMM + hwePropMU);
+        vafSum += vaf;
+        count++;
+      }
+    });
+    
+    const avgVAF = count > 0 ? vafSum / count : 0;
+    return avgVAF;
+  };
+  
+  const rawScore = calculateVAF();
+  const predictedVAF = Math.max(0, 195 * rawScore - 18.7);
+  
+  const steps = [
+    {
+      title: "Step 1: Select CpGs",
+      description: "Group CpGs with similar mean methylation values (here: 0.25-0.30)"
+    },
+    {
+      title: "Step 2: Hardy-Weinberg Equilibrium",
+      description: "Calculate expected allele proportions for population mean p=0.30"
+    },
+    {
+      title: "Step 3: Assign CpG States",
+      description: "Assign each CpG to nearest peak (0, 0.5, or 1.0) in HWE proportions"
+    },
+    {
+      title: "Step 4: Calculate Deviations",
+      description: "Measure how far each CpG has shifted from the population mean"
+    },
+    {
+      title: "Step 5: Compute COMET Score",
+      description: "Calculate VAF based on deviations and assigned states"
+    }
+  ];
+
+  return (
+    <div className="w-full max-w-6xl mx-auto p-6 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg shadow-lg">
+      <div className="mb-6">
+        <h1 className="text-3xl font-bold text-gray-800 mb-2">COMET Algorithm Visualization</h1>
+        <p className="text-gray-600">Interactive demonstration of Clonal Observation from METhylation</p>
+      </div>
+      
+      {/* Clonality Slider */}
+      <div className="bg-white p-4 rounded-lg shadow mb-6">
+        <label className="block text-sm font-semibold text-gray-700 mb-2">
+          Clonal Hematopoiesis Level: {clonality}%
+        </label>
+        <input
+          type="range"
+          min="0"
+          max="50"
+          value={clonality}
+          onChange={(e) => setClonality(Number(e.target.value))}
+          className="w-full h-2 bg-blue-200 rounded-lg appearance-none cursor-pointer"
+        />
+        <div className="flex justify-between text-xs text-gray-500 mt-1">
+          <span>No CH (0%)</span>
+          <span>Moderate CH (25%)</span>
+          <span>High CH (50%)</span>
+        </div>
+      </div>
+
+      {/* Step Navigation */}
+      <div className="bg-white p-4 rounded-lg shadow mb-6">
+        <div className="flex items-center justify-between mb-4">
+          <button
+            onClick={() => setStep(Math.max(0, step - 1))}
+            disabled={step === 0}
+            className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded disabled:bg-gray-300 disabled:cursor-not-allowed"
+          >
+            <ChevronLeft size={20} /> Previous
+          </button>
+          
+          <div className="text-center">
+            <h2 className="text-xl font-bold text-gray-800">{steps[step].title}</h2>
+            <p className="text-sm text-gray-600 mt-1">{steps[step].description}</p>
+          </div>
+          
+          <button
+            onClick={() => setStep(Math.min(steps.length - 1, step + 1))}
+            disabled={step === steps.length - 1}
+            className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded disabled:bg-gray-300 disabled:cursor-not-allowed"
+          >
+            Next <ChevronRight size={20} />
+          </button>
+        </div>
+        
+        {/* Progress Bar */}
+        <div className="w-full bg-gray-200 rounded-full h-2">
+          <div
+            className="bg-blue-500 h-2 rounded-full transition-all duration-300"
+            style={{ width: `${((step + 1) / steps.length) * 100}%` }}
+          />
+        </div>
+      </div>
+
+      {/* Main Visualization */}
+      <div className="bg-white p-6 rounded-lg shadow mb-6">
+        {step === 0 && (
+          <div>
+            <h3 className="text-lg font-semibold mb-4">CpG Distribution</h3>
+            <div className="relative h-64 border-2 border-gray-300 rounded">
+              <svg width="100%" height="100%" viewBox="0 0 600 250">
+                {/* Axes */}
+                <line x1="50" y1="200" x2="550" y2="200" stroke="#333" strokeWidth="2" />
+                <line x1="50" y1="200" x2="50" y2="20" stroke="#333" strokeWidth="2" />
+                
+                {/* X-axis labels */}
+                <text x="50" y="220" fontSize="12" textAnchor="middle">0.0</text>
+                <text x="300" y="220" fontSize="12" textAnchor="middle">0.5</text>
+                <text x="550" y="220" fontSize="12" textAnchor="middle">1.0</text>
+                <text x="300" y="240" fontSize="14" textAnchor="middle" fontWeight="bold">Methylation Value</text>
+                
+                {/* Mean line */}
+                <line
+                  x1={50 + p * 500}
+                  y1="20"
+                  x2={50 + p * 500}
+                  y2="200"
+                  stroke="#f59e0b"
+                  strokeWidth="2"
+                  strokeDasharray="5,5"
+                />
+                <text x={50 + p * 500} y="15" fontSize="12" fill="#f59e0b" textAnchor="middle">
+                  Mean={p}
+                </text>
+                
+                {/* Plot CpGs */}
+                {cpgs.map((cpg, i) => (
+                  <circle
+                    key={cpg.id}
+                    cx={50 + cpg.value * 500}
+                    cy={190 - (i % 8) * 20}
+                    r="4"
+                    fill="#3b82f6"
+                    opacity="0.7"
+                  />
+                ))}
+              </svg>
+            </div>
+            <p className="mt-4 text-sm text-gray-600">
+              30 CpGs with mean methylation ~0.30. As clonality increases, CpGs shift toward 0, 0.5, or 1.0.
+            </p>
+          </div>
+        )}
+
+        {step === 1 && (
+          <div>
+            <h3 className="text-lg font-semibold mb-4">Hardy-Weinberg Equilibrium</h3>
+            <div className="grid grid-cols-3 gap-4 mb-4">
+              <div className="bg-purple-100 p-4 rounded text-center">
+                <div className="text-3xl font-bold text-purple-700">{(hwePropUU * 100).toFixed(1)}%</div>
+                <div className="text-sm text-gray-600 mt-2">UU (Unmethylated)</div>
+                <div className="text-xs text-gray-500 mt-1">= (1-p)² = {hwePropUU.toFixed(3)}</div>
+              </div>
+              <div className="bg-green-100 p-4 rounded text-center">
+                <div className="text-3xl font-bold text-green-700">{(hwePropMU * 100).toFixed(1)}%</div>
+                <div className="text-sm text-gray-600 mt-2">MU (Partially methylated)</div>
+                <div className="text-xs text-gray-500 mt-1">= 2p(1-p) = {hwePropMU.toFixed(3)}</div>
+              </div>
+              <div className="bg-red-100 p-4 rounded text-center">
+                <div className="text-3xl font-bold text-red-700">{(hwePropMM * 100).toFixed(1)}%</div>
+                <div className="text-sm text-gray-600 mt-2">MM (Methylated)</div>
+                <div className="text-xs text-gray-500 mt-1">= p² = {hwePropMM.toFixed(3)}</div>
+              </div>
+            </div>
+            <div className="bg-blue-50 p-4 rounded">
+              <p className="text-sm text-gray-700">
+                <strong>For p = {p}:</strong> We expect {expectedUU} UU cells, {expectedMU} MU cells, and {expectedMM} MM cells out of {totalCpGs} total CpGs.
+              </p>
+            </div>
+          </div>
+        )}
+
+        {step === 2 && (
+          <div>
+            <h3 className="text-lg font-semibold mb-4">Assign CpGs to States</h3>
+            <div className="relative h-64 border-2 border-gray-300 rounded">
+              <svg width="100%" height="100%" viewBox="0 0 600 250">
+                {/* Axes */}
+                <line x1="50" y1="200" x2="550" y2="200" stroke="#333" strokeWidth="2" />
+                
+                {/* Target peaks */}
+                <line x1="50" y1="200" x2="50" y2="100" stroke="#9333ea" strokeWidth="3" opacity="0.5" />
+                <text x="50" y="90" fontSize="12" fill="#9333ea" textAnchor="middle" fontWeight="bold">UU</text>
+                
+                <line x1="300" y1="200" x2="300" y2="100" stroke="#22c55e" strokeWidth="3" opacity="0.5" />
+                <text x="300" y="90" fontSize="12" fill="#22c55e" textAnchor="middle" fontWeight="bold">MU</text>
+                
+                <line x1="550" y1="200" x2="550" y2="100" stroke="#ef4444" strokeWidth="3" opacity="0.5" />
+                <text x="550" y="90" fontSize="12" fill="#ef4444" textAnchor="middle" fontWeight="bold">MM</text>
+                
+                {/* X-axis labels */}
+                <text x="50" y="220" fontSize="12" textAnchor="middle">0</text>
+                <text x="300" y="220" fontSize="12" textAnchor="middle">0.5</text>
+                <text x="550" y="220" fontSize="12" textAnchor="middle">1.0</text>
+                
+                {/* Plot assigned CpGs */}
+                {assignedCpGs.map((cpg, i) => {
+                  const color = cpg.assigned === 'UU' ? '#9333ea' : 
+                               cpg.assigned === 'MU' ? '#22c55e' : '#ef4444';
+                  return (
+                    <circle
+                      key={cpg.id}
+                      cx={50 + cpg.value * 500}
+                      cy={190 - (i % 8) * 20}
+                      r="4"
+                      fill={color}
+                      opacity="0.8"
+                    />
+                  );
+                })}
+              </svg>
+            </div>
+            <div className="flex gap-4 mt-4 text-sm">
+              <div className="flex items-center gap-2">
+                <div className="w-4 h-4 bg-purple-600 rounded"></div>
+                <span>Assigned UU (→0)</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-4 h-4 bg-green-600 rounded"></div>
+                <span>Assigned MU (→0.5)</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-4 h-4 bg-red-600 rounded"></div>
+                <span>Assigned MM (→1.0)</span>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {step === 3 && (
+          <div>
+            <h3 className="text-lg font-semibold mb-4">Calculate Deviations from Mean</h3>
+            <div className="relative h-64 border-2 border-gray-300 rounded">
+              <svg width="100%" height="100%" viewBox="0 0 600 250">
+                {/* Mean line */}
+                <line
+                  x1={50 + p * 500}
+                  y1="20"
+                  x2={50 + p * 500}
+                  y2="200"
+                  stroke="#f59e0b"
+                  strokeWidth="3"
+                  strokeDasharray="5,5"
+                />
+                <text x={50 + p * 500} y="15" fontSize="12" fill="#f59e0b" textAnchor="middle" fontWeight="bold">
+                  Mean={p}
+                </text>
+                
+                {/* Show first few deviations */}
+                {assignedCpGs.slice(0, 5).map((cpg, i) => {
+                  const color = cpg.assigned === 'UU' ? '#9333ea' : 
+                               cpg.assigned === 'MU' ? '#22c55e' : '#ef4444';
+                  const y = 50 + i * 30;
+                  return (
+                    <g key={cpg.id}>
+                      <line
+                        x1={50 + p * 500}
+                        y1={y}
+                        x2={50 + cpg.value * 500}
+                        y2={y}
+                        stroke={color}
+                        strokeWidth="2"
+                        opacity="0.6"
+                      />
+                      <circle
+                        cx={50 + cpg.value * 500}
+                        cy={y}
+                        r="4"
+                        fill={color}
+                      />
+                      <text x={350} y={y + 4} fontSize="10" fill="#666">
+                        Δ = {(cpg.value - p).toFixed(3)}
+                      </text>
+                    </g>
+                  );
+                })}
+                
+                <text x="300" y="230" fontSize="12" textAnchor="middle" fill="#666">
+                  Showing 10 of {cpgs.length} CpGs
+                </text>
+              </svg>
+            </div>
+            <p className="mt-4 text-sm text-gray-600">
+              Each CpG deviation (Δ) from the mean indicates how much clonal expansion has shifted its value.
+            </p>
+          </div>
+        )}
+
+        {step === 4 && (
+          <div>
+            <h3 className="text-lg font-semibold mb-4">Compute COMET Score and VAF</h3>
+            <div className="space-y-4">
+              <div className="bg-blue-50 p-4 rounded">
+                <h4 className="font-semibold text-gray-700 mb-2">VAF Calculation for Each CpG:</h4>
+                <div className="text-sm space-y-1 font-mono">
+                  <div>If assigned MM: VAF = (x - p) / (2×P_UU + P_MU)</div>
+                  <div>If assigned UU: VAF = (p - x) / (2×P_MM + P_MU)</div>
+                  <div className="text-gray-500">If assigned MU: Ignored (weakest signal)</div>
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div className="bg-green-50 p-4 rounded">
+                  <div className="text-sm text-gray-600 mb-1">Raw COMET Score</div>
+                  <div className="text-3xl font-bold text-green-700">{rawScore.toFixed(4)}</div>
+                </div>
+                <div className="bg-purple-50 p-4 rounded">
+                  <div className="text-sm text-gray-600 mb-1">Predicted VAF</div>
+                  <div className="text-3xl font-bold text-purple-700">{predictedVAF.toFixed(1)}%</div>
+                </div>
+              </div>
+              
+              <div className="bg-yellow-50 p-4 rounded">
+                <h4 className="font-semibold text-gray-700 mb-2">Calibration Formula:</h4>
+                <div className="text-sm font-mono">
+                  Predicted VAF = 195 × COMET_score - 18.7
+                </div>
+                <p className="text-xs text-gray-600 mt-2">
+                  (Calibrated using mixed-effects regression on training data)
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Reset Button */}
+      <div className="text-center">
+        <button
+          onClick={() => { setStep(0); setClonality(30); }}
+          className="flex items-center gap-2 mx-auto px-6 py-2 bg-gray-500 text-white rounded hover:bg-gray-600"
+        >
+          <RotateCcw size={18} /> Reset Demo
+        </button>
+      </div>
+    </div>
+  );
+};
+
+// Render the app
+const root = ReactDOM.createRoot(document.getElementById('root'));
+root.render(<COMETVisualization />);
+    </script>
+</body>
+</html>
