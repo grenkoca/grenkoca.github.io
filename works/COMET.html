@@ -21,6 +21,11 @@ const gaussianKernel = (x, xi, bandwidth) => {
   return Math.exp(-0.5 * u * u) / (bandwidth * Math.sqrt(2 * Math.PI));
 };
 
+// Calculate true VAF (simulated ground truth)
+const calculateTrueVAF = (vafPercent) => {
+  return vafPercent; // The slider directly represents VAF
+};
+
 // Calculate KDE for a set of data points
 const calculateKDE = (data, bandwidth = 0.05, numPoints = 100, normalize = true) => {
   const min = 0;
@@ -71,7 +76,7 @@ const RotateCcw = ({ size }) => (
 
 const COMETVisualization = () => {
   const [step, setStep] = useState(0);
-  const [clonality, setClonality] = useState(30);
+  const [vaf, setVaf] = useState(30); // Changed from clonality to vaf
   
   const meanMethylation = 0.3;
   
@@ -82,15 +87,17 @@ const COMETVisualization = () => {
   const hwePropUU = (1 - p) * (1 - p);
   
   // Generate example CpGs
-  const generateCpGs = (clonalityPercent) => {
-    const clonalFraction = clonalityPercent / 100;
+  const generateCpGs = (vafPercent) => {
+    const vafFraction = vafPercent / 100;
+    // Convert VAF to clonality: for heterozygous mutations, clonality = 2 * VAF
+    const clonality = vafFraction * 2;
     const cpgs = [];
-    
+
     // Simulate 100 CpGs
     for (let i = 0; i < 100; i++) {
       const random = Math.random();
       let originalState, targetValue;
-      
+
       // Assign states based on HWE
       if (random < hwePropUU) {
         originalState = 'UU';
@@ -102,12 +109,13 @@ const COMETVisualization = () => {
         originalState = 'MM';
         targetValue = 1.0;
       }
-      
+
       // Add noise
       const noise = (Math.random() - 0.5) * 0.1;
-      const observedValue = p + (targetValue - p) * clonalFraction + noise;
+      // Use clonality (not VAF) to calculate the shift toward target state
+      const observedValue = p + (targetValue - p) * clonality + noise;
       const clampedValue = Math.max(0, Math.min(1, observedValue));
-      
+
       cpgs.push({
         id: i,
         state: originalState,
@@ -115,11 +123,12 @@ const COMETVisualization = () => {
         target: targetValue
       });
     }
-    
+
     return cpgs;
   };
   
-  const cpgs = generateCpGs(clonality);
+  const cpgs = generateCpGs(vaf);
+  const trueVAF = vaf; // True VAF is the slider value
 
   // Calculate KDE for all CpGs
   const kdeAll = useMemo(() => {
@@ -168,7 +177,10 @@ const COMETVisualization = () => {
   };
   
   const rawScore = calculateVAF();
-  const predictedVAF = Math.max(0, 195 * rawScore - 18.7);
+  // Convert raw score to percentage for comparison
+  const rawScorePercent = rawScore * 100;
+  const relativeError = trueVAF > 0 ? ((rawScorePercent - trueVAF) / trueVAF) * 100 : 0;
+  const absoluteError = Math.abs(rawScorePercent - trueVAF);
 
   // Calculate KDE for each assigned state
   const kdeByState = useMemo(() => {
@@ -203,12 +215,12 @@ const COMETVisualization = () => {
       description: "Group CpGs with similar mean methylation values (here: 0.25-0.30)"
     },
     {
-      title: "Step 2: Hardy-Weinberg Equilibrium",
-      description: "Calculate expected allele proportions for population mean p=0.30"
+      title: "Step 2: Calculate Expected Equilibrium",
+      description: "Calculate expected allele proportions (UU, UM, MM) for population mean p=0.30"
     },
     {
       title: "Step 3: Assign CpG States",
-      description: "Assign each CpG to nearest peak (0, 0.5, or 1.0) in HWE proportions"
+      description: "Assign each CpG to nearest peak (0, 0.5, or 1.0) in expected proportions"
     },
     {
       title: "Step 4: Calculate Deviations",
@@ -262,23 +274,23 @@ const COMETVisualization = () => {
         </div>
       </div>
       
-    {/* Clonality Slider */}
+    {/* VAF Slider */}
       <div className="bg-white p-4 rounded-lg shadow mb-6">
         <label className="block text-sm font-semibold text-gray-700 mb-2">
-          Clonal Hematopoiesis Level: {clonality}%
+          Simulated VAF: {vaf}%
         </label>
         <input
           type="range"
           min="0"
-          max="100"
-          value={clonality}
-          onChange={(e) => setClonality(Number(e.target.value))}
+          max="50"
+          value={vaf}
+          onChange={(e) => setVaf(Number(e.target.value))}
           className="w-full h-2 bg-blue-200 rounded-lg appearance-none cursor-pointer"
         />
         <div className="flex justify-between text-xs text-gray-500 mt-1">
-          <span>No CH (0%)</span>
-          <span>Moderate CH (50%)</span>
-          <span>High CH (100%)</span>
+          <span>0% VAF</span>
+          <span>25% VAF</span>
+          <span>50% VAF</span>
         </div>
       </div>
 
@@ -344,14 +356,14 @@ const COMETVisualization = () => {
               <span className="text-xs text-gray-600">Kernel Density Estimate</span>
             </div>
             <p className="mt-2 text-sm text-gray-600">
-              30 CpGs with mean methylation ~0.30. As clonality increases, CpGs shift toward 0, 0.5, or 1.0.
+              100 CpGs with mean methylation ~0.30. As VAF increases, CpGs shift toward 0, 0.5, or 1.0.
             </p>
           </div>
         )}
 
         {step === 1 && (
           <div>
-            <h3 className="text-lg font-semibold mb-4">Hardy-Weinberg Equilibrium</h3>
+            <h3 className="text-lg font-semibold mb-4">Expected State Equilibrium</h3>
             <div className="grid grid-cols-3 gap-4 mb-4">
               <div className="bg-purple-100 p-4 rounded text-center">
                 <div className="text-3xl font-bold text-purple-700">{(hwePropUU * 100).toFixed(1)}%</div>
@@ -628,40 +640,54 @@ const COMETVisualization = () => {
 
         {step === 4 && (
           <div>
-            <h3 className="text-lg font-semibold mb-4">Compute COMET Score and VAF</h3>
+            <h3 className="text-lg font-semibold mb-4">Compute COMET Score</h3>
             <div className="space-y-4">
               <div className="bg-blue-50 p-4 rounded">
-                <h4 className="font-semibold text-gray-700 mb-2">VAF Calculation for Each CpG:</h4>
+                <h4 className="font-semibold text-gray-700 mb-2">COMET Score Calculation for Each CpG:</h4>
                 <div className="text-sm space-y-1 font-mono">
-                  <div>If assigned MM: VAF = (x - p) / (2×P_UU + P_MU)</div>
-                  <div>If assigned UU: VAF = (p - x) / (2×P_MM + P_MU)</div>
+                  <div>If assigned MM: score = (x - p) / (2×P_UU + P_MU)</div>
+                  <div>If assigned UU: score = (p - x) / (2×P_MM + P_MU)</div>
                   <div className="text-gray-500">If assigned MU: Ignored (weakest signal)</div>
                 </div>
+                <p className="text-xs text-gray-600 mt-2">
+                  The raw COMET score is the average of these individual scores across all UU and MM assigned CpGs.
+                </p>
               </div>
-              
+
               <div className="grid grid-cols-2 gap-4">
                 <div className="bg-green-50 p-4 rounded">
                   <div className="text-sm text-gray-600 mb-1">Raw COMET Score</div>
                   <div className="text-3xl font-bold text-green-700">{rawScore.toFixed(4)}</div>
+                  <div className="text-sm text-gray-500 mt-1">({rawScorePercent.toFixed(1)}%)</div>
                 </div>
-                <div className="bg-purple-50 p-4 rounded">
-                  <div className="text-sm text-gray-600 mb-1">Predicted VAF</div>
-                  <div className="text-3xl font-bold text-purple-700">{predictedVAF.toFixed(1)}%</div>
+                <div className="bg-orange-50 p-4 rounded">
+                  <div className="text-sm text-gray-600 mb-1">True VAF</div>
+                  <div className="text-3xl font-bold text-orange-700">{trueVAF.toFixed(1)}%</div>
+                  <div className="text-sm text-gray-500 mt-1">(from slider)</div>
                 </div>
               </div>
-              
-              <div className="bg-yellow-50 p-4 rounded">
-                <h4 className="font-semibold text-gray-700 mb-2">Calibration Formula:</h4>
-                <div className="text-sm font-mono">
-                  Predicted VAF = 195 × COMET_score - 18.7
+
+              <div className="bg-rose-50 p-4 rounded">
+                <h4 className="font-semibold text-gray-700 mb-2">Error Metrics:</h4>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <div className="text-sm text-gray-600">Relative Error</div>
+                    <div className="text-2xl font-bold text-rose-700">
+                      {relativeError.toFixed(1)}%
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-sm text-gray-600">Absolute Error</div>
+                    <div className="text-2xl font-bold text-rose-700">
+                      {absoluteError.toFixed(1)} pp
+                    </div>
+                  </div>
                 </div>
-                <p className="text-sm text-gray-600 mt-2">
-                  Note: since variants detected in sequencing are heterozygous, the VAF will be ~50% of the expanded clone frequency.
-                </p>
-                <p className="text-xs text-gray-600 mt-2">
-                  (Calibrated using mixed-effects regression on training data.)
-                </p>
+                <div className="text-xs text-gray-600 mt-2">
+                  Raw score can be calibrated to predict VAFs for real data using regression models.
+                </div>
               </div>
+
             </div>
           </div>
         )}
@@ -670,7 +696,7 @@ const COMETVisualization = () => {
       {/* Reset Button */}
       <div className="text-center">
         <button
-          onClick={() => { setStep(0); setClonality(30); }}
+          onClick={() => { setStep(0); setVaf(30); }}
           className="flex items-center gap-2 mx-auto px-6 py-2 bg-gray-500 text-white rounded hover:bg-gray-600"
         >
           <RotateCcw size={18} /> Reset Demo
