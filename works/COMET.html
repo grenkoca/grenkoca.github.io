@@ -239,6 +239,25 @@ const COMETVisualization = () => {
         <p className="text-gray-600">Interactive demonstration of Clonal Observation from METhylation</p>
       </div>
       
+    {/* VAF Slider */}
+      <div className="bg-white p-4 rounded-lg shadow mb-6">
+        <label className="block text-sm font-semibold text-gray-700 mb-2">
+          Simulated VAF: {vaf}%
+        </label>
+        <input
+          type="range"
+          min="0"
+          max="50"
+          value={vaf}
+          onChange={(e) => setVaf(Number(e.target.value))}
+          className="w-full h-2 bg-blue-200 rounded-lg appearance-none cursor-pointer"
+        />
+        <div className="flex justify-between text-xs text-gray-500 mt-1">
+          <span>0% VAF</span>
+          <span>25% VAF</span>
+          <span>50% VAF</span>
+        </div>
+      </div>
 
       {/* Step Navigation */}
       <div className="bg-white p-4 rounded-lg shadow mb-6">
@@ -274,25 +293,6 @@ const COMETVisualization = () => {
         </div>
       </div>
       
-    {/* VAF Slider */}
-      <div className="bg-white p-4 rounded-lg shadow mb-6">
-        <label className="block text-sm font-semibold text-gray-700 mb-2">
-          Simulated VAF: {vaf}%
-        </label>
-        <input
-          type="range"
-          min="0"
-          max="50"
-          value={vaf}
-          onChange={(e) => setVaf(Number(e.target.value))}
-          className="w-full h-2 bg-blue-200 rounded-lg appearance-none cursor-pointer"
-        />
-        <div className="flex justify-between text-xs text-gray-500 mt-1">
-          <span>0% VAF</span>
-          <span>25% VAF</span>
-          <span>50% VAF</span>
-        </div>
-      </div>
 
       {/* Main Visualization */}
       <div className="bg-white p-6 rounded-lg shadow mb-6">
@@ -657,8 +657,8 @@ const COMETVisualization = () => {
               <div className="grid grid-cols-2 gap-4">
                 <div className="bg-green-50 p-4 rounded">
                   <div className="text-sm text-gray-600 mb-1">Raw COMET Score</div>
-                  <div className="text-3xl font-bold text-green-700">{rawScore.toFixed(4)}</div>
-                  <div className="text-sm text-gray-500 mt-1">({rawScorePercent.toFixed(1)}%)</div>
+                  <div className="text-3xl font-bold text-green-700">{rawScorePercent.toFixed(1)}%</div>
+                  <div className="text-sm text-gray-500 mt-1">({rawScore.toFixed(3)})</div>
                 </div>
                 <div className="bg-orange-50 p-4 rounded">
                   <div className="text-sm text-gray-600 mb-1">True VAF</div>
