@@ -498,7 +498,7 @@ const COMETVisualization = () => {
         {step === 3 && (
           <div>
             <h3 className="text-lg font-semibold mb-4">Calculate Deviations from Mean</h3>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4">
               {/* Left side: Deviations */}
               <div>
                 <h4 className="text-md font-semibold mb-2 text-gray-700">Sample of Deviations</h4>
@@ -554,83 +554,6 @@ const COMETVisualization = () => {
                 </div>
               </div>
 
-              {/* Right side: Expected vs Observed proportions */}
-              <div>
-                <h4 className="text-md font-semibold mb-2 text-gray-700">Expected vs Observed Proportions</h4>
-                <div className="border-2 border-gray-300 rounded p-4">
-                  <table className="w-full text-center">
-                    <thead>
-                      <tr className="border-b-2 border-gray-300">
-                        <th className="py-2 text-sm font-semibold text-gray-600">State</th>
-                        <th className="py-2 text-sm font-semibold text-gray-600">Expected</th>
-                        <th className="py-2 text-sm font-semibold text-gray-600">Observed</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr className="border-b border-gray-200">
-                        <td className="py-3 px-2">
-                          <div className="flex items-center justify-center gap-2">
-                            <div className="w-4 h-4 bg-purple-600 rounded"></div>
-                            <span className="font-semibold text-purple-700">UU</span>
-                          </div>
-                        </td>
-                        <td className="py-3 px-2">
-                          <div className="bg-purple-100 rounded px-3 py-1 inline-block">
-                            <span className="font-semibold text-purple-700">{(hwePropUU * 100).toFixed(1)}%</span>
-                          </div>
-                        </td>
-                        <td className="py-3 px-2">
-                          <div className="bg-purple-100 rounded px-3 py-1 inline-block">
-                            <span className="font-semibold text-purple-700">
-                              {((assignedCpGs.filter(c => c.assigned === 'UU').length / totalCpGs) * 100).toFixed(1)}%
-                            </span>
-                          </div>
-                        </td>
-                      </tr>
-                      <tr className="border-b border-gray-200">
-                        <td className="py-3 px-2">
-                          <div className="flex items-center justify-center gap-2">
-                            <div className="w-4 h-4 bg-green-600 rounded"></div>
-                            <span className="font-semibold text-green-700">MU</span>
-                          </div>
-                        </td>
-                        <td className="py-3 px-2">
-                          <div className="bg-green-100 rounded px-3 py-1 inline-block">
-                            <span className="font-semibold text-green-700">{(hwePropMU * 100).toFixed(1)}%</span>
-                          </div>
-                        </td>
-                        <td className="py-3 px-2">
-                          <div className="bg-green-100 rounded px-3 py-1 inline-block">
-                            <span className="font-semibold text-green-700">
-                              {((assignedCpGs.filter(c => c.assigned === 'MU').length / totalCpGs) * 100).toFixed(1)}%
-                            </span>
-                          </div>
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="py-3 px-2">
-                          <div className="flex items-center justify-center gap-2">
-                            <div className="w-4 h-4 bg-red-600 rounded"></div>
-                            <span className="font-semibold text-red-700">MM</span>
-                          </div>
-                        </td>
-                        <td className="py-3 px-2">
-                          <div className="bg-red-100 rounded px-3 py-1 inline-block">
-                            <span className="font-semibold text-red-700">{(hwePropMM * 100).toFixed(1)}%</span>
-                          </div>
-                        </td>
-                        <td className="py-3 px-2">
-                          <div className="bg-red-100 rounded px-3 py-1 inline-block">
-                            <span className="font-semibold text-red-700">
-                              {((assignedCpGs.filter(c => c.assigned === 'MM').length / totalCpGs) * 100).toFixed(1)}%
-                            </span>
-                          </div>
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-              </div>
             </div>
             <p className="mt-3 text-xs text-gray-600">
               Each CpG deviation (Δ) from the mean indicates how much clonal expansion has shifted its value.
@@ -642,18 +565,6 @@ const COMETVisualization = () => {
           <div>
             <h3 className="text-lg font-semibold mb-4">Compute COMET Score</h3>
             <div className="space-y-4">
-              <div className="bg-blue-50 p-4 rounded">
-                <h4 className="font-semibold text-gray-700 mb-2">COMET Score Calculation for Each CpG:</h4>
-                <div className="text-sm space-y-1 font-mono">
-                  <div>If assigned MM: score = (x - p) / (2×P_UU + P_MU)</div>
-                  <div>If assigned UU: score = (p - x) / (2×P_MM + P_MU)</div>
-                  <div className="text-gray-500">If assigned MU: Ignored (weakest signal)</div>
-                </div>
-                <p className="text-xs text-gray-600 mt-2">
-                  The raw COMET score is the average of these individual scores across all UU and MM assigned CpGs.
-                </p>
-              </div>
-
               <div className="grid grid-cols-2 gap-4">
                 <div className="bg-green-50 p-4 rounded">
                   <div className="text-sm text-gray-600 mb-1">Raw COMET Score</div>
@@ -687,6 +598,19 @@ const COMETVisualization = () => {
                   Raw score can be calibrated to predict VAFs for real data using regression models.
                 </div>
               </div>
+
+              <div className="bg-blue-50 p-4 rounded">
+                <h4 className="font-semibold text-gray-700 mb-2">COMET Score Calculation for Each CpG:</h4>
+                <div className="text-sm space-y-1 font-mono">
+                  <div>If assigned MM: score = (x - p) / (2×P_UU + P_MU)</div>
+                  <div>If assigned UU: score = (p - x) / (2×P_MM + P_MU)</div>
+                  <div className="text-gray-500">If assigned MU: Ignored (weakest signal)</div>
+                </div>
+                <p className="text-xs text-gray-600 mt-2">
+                  The raw COMET score is the average of these individual scores across all UU and MM assigned CpGs.
+                </p>
+              </div>
+
 
             </div>
           </div>
