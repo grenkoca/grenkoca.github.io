@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Methylation Drift Explorer</title>
+<style>
+  * { box-sizing: border-box; }
+  body { font-family: system-ui, sans-serif; margin: 20px; background: #f5f6f8; color: #222; }
+  h2 { margin: 0 0 8px; font-size: 20px; }
+  p { margin: 0 0 8px; font-size: 14px; line-height: 1.45; color: #444; }
+  .card { background: white; border-radius: 8px; box-shadow: 0 1px 4px rgba(0,0,0,.12); padding: 16px; margin-bottom: 14px; }
+  .layout { display: flex; flex-wrap: wrap; gap: 14px; align-items: flex-start; }
+  .controls { flex: 0 0 300px; }
+  .plot { flex: 1 1 480px; min-width: 0; }
+  .ctl { margin-bottom: 12px; }
+  .ctl label { display: flex; justify-content: space-between; font-size: 13px; font-weight: 600; color: #333; }
+  .ctl label span { font-weight: 400; color: #3a6bc4; font-variant-numeric: tabular-nums; }
+  .ctl small { display: block; font-size: 11px; color: #888; }
+  input[type=range] { width: 100%; }
+  button { padding: 6px 14px; border: 1px solid #aaa; background: white; cursor: pointer; border-radius: 4px; font-size: 13px; }
+  button:hover { background: #eef2fa; }
+  canvas { width: 100%; height: auto; display: block; }
+  #readout { font-size: 13px; color: #666; height: 18px; margin-top: 6px; font-variant-numeric: tabular-nums; }
+  .opt { font-size: 13px; margin-right: 12px; }
+</style>
+</head>
+<body>
+<h2>Methylation Drift Explorer</h2>
+<p>Z is the fraction of stem cells that are methylated at one CpG site (Z = M / N). As stem cells divide, Z drifts toward a
+  steady level (&eta;) and spreads out between people. The heatmap shows how likely each value of Z is at each age; darker means more likely.
+  Drag the sliders to see how each parameter changes it.</p>
+
+<div class="layout">
+  <div class="card controls">
+    <div id="sliders"></div>
+    <label class="opt"><input type="checkbox" id="showSD" checked> Show &plusmn;2 SD</label>
+    <button id="reset">Reset</button>
+  </div>
+  <div class="card plot">
+    <canvas id="cv" width="800" height="520"></canvas>
+    <div id="readout">Hover over the plot to read values.</div>
+  </div>
+</div>
+
+<script>
+// ---- Model (ported from 1.8_SCARLET_testing.ipynb) ----
+const sq = x => x * x;
+const meanZ = (t, s, n, w, p) => n + Math.exp(-2*s*t*w) * (p - n);
+const covNM = (t, s, N, n, w, p) => 2*s*N*t * (n + Math.exp(-2*s*t*w) * (1-w) * (p-n));
+const varN  = (t, s, N) => 2*s*N*t;
+
+function varM(t, s, N, n, w, p, c) {
+  const A0 = N*n*(1 + sq(w) - n*(1 + sq(w) - 4*s*w*t));
+  const A2 = 2*N*(n-p)*(-1 + w - sq(w) + 2*n*(1 - w*(1+2*s*t) + sq(w)*(1+2*s*t)));
+  const A4 = sq(n)*N*(-3 + 4*w - 3*sq(w))
+           + 2*(c*w + N*p*(-1 + w - sq(w)))
+           + n*N*(1 + 4*p - 2*w*(1+2*p) + sq(w)*(1+4*p));
+  return (A0 + A2*Math.exp(-2*s*t*w) + A4*Math.exp(-4*s*t*w)) / (2*w);
+}
+
+function varZ(t, s, N, n, w, p, c) {
+  const mZ = meanZ(t, s, n, w, p);
+  return (sq(mZ)*varN(t, s, N) + varM(t, s, N, n, w, p, c) - 2*mZ*covNM(t, s, N, n, w, p)) / sq(N);
+}
+
+// ---- Beta pdf ----
+const LG = [676.5203681218851, -1259.1392167224028, 771.32342877765313, -176.61502916214059,
+            12.507343278686905, -0.13857109526572012, 9.9843695780195716e-6, 1.5056327351493116e-7];
+function lgamma(x) {
+  if (x < 0.5) return Math.log(Math.PI / Math.abs(Math.sin(Math.PI*x))) - lgamma(1 - x);
+  x -= 1;
+  let a = 0.99999999999980993;
+  const t = x + 7.5;
+  for (let i = 0; i < 8; i++) a += LG[i] / (x + i + 1);
+  return 0.5*Math.log(2*Math.PI) + (x + 0.5)*Math.log(t) - t + Math.log(a);
+}
+const betaPdf = (z, a, b, lnB) => Math.exp((a-1)*Math.log(z) + (b-1)*Math.log(1-z) - lnB);
+
+// ---- Controls ----
+// scale: 'lin' or 'log'; value shown via fmt
+const DEFAULTS = { s: 1, N: 10000, n: 0.2, w: 0.01, p: 0.001, v0: 0.001, tmax: 100 };
+const SPEC = [
+  { k: 's',    label: 'Division rate (s)',            note: 'divisions per stem cell per year', min: 0.1,   max: 5,      step: 0.1 },
+  { k: 'N',    label: 'Stem cells (N)',               note: 'fewer cells = more random drift',  min: 100,   max: 1e6,    log: true },
+  { k: 'n',    label: 'Equilibrium methylation (η)',  note: 'level Z settles at after a long time', min: 0, max: 1,     step: 0.01 },
+  { k: 'w',    label: 'Switching rate (ω)',           note: 'how fast Z approaches η',          min: 0.001, max: 0.1,    log: true },
+  { k: 'p',    label: 'Initial methylation (p)',      note: 'average Z at birth',               min: 0,     max: 1,      step: 0.001 },
+  { k: 'v0',   label: 'Initial variance of Z',        note: 'person-to-person spread at birth', min: 0,     max: 0.05,   step: 0.0005 },
+  { k: 'tmax', label: 'Max age (years)',              note: '',                                 min: 10,    max: 120,    step: 1 },
+];
+const state = { ...DEFAULTS };
+const inputs = {};
+
+function toSlider(sp, v) { return sp.log ? Math.log10(v) : v; }
+function fromSlider(sp, x) { return sp.log ? Math.pow(10, x) : x; }
+function fmt(sp, v) { return sp.log ? v.toPrecision(3) : (sp.step < 0.01 ? v.toFixed(4) : sp.step < 1 ? v.toFixed(2) : v.toFixed(0)); }
+
+const box = document.getElementById('sliders');
+for (const sp of SPEC) {
+  const d = document.createElement('div');
+  d.className = 'ctl';
+  d.innerHTML = `<label>${sp.label}<span></span></label><input type="range"><small>${sp.note}</small>`;
+  const r = d.querySelector('input');
+  r.min = toSlider(sp, sp.min); r.max = toSlider(sp, sp.max);
+  r.step = sp.log ? 0.01 : sp.step;
+  r.addEventListener('input', () => { state[sp.k] = fromSlider(sp, +r.value); sync(); draw(); });
+  inputs[sp.k] = { r, out: d.querySelector('span'), sp };
+  box.appendChild(d);
+}
+function sync() {
+  for (const k in inputs) {
+    const { r, out, sp } = inputs[k];
+    r.value = toSlider(sp, state[k]);
+    out.textContent = fmt(sp, state[k]);
+  }
+}
+document.getElementById('reset').onclick = () => { Object.assign(state, DEFAULTS); sync(); draw(); };
+document.getElementById('showSD').onchange = () => draw();
+
+// ---- Drawing ----
+const cv = document.getElementById('cv'), ctx = cv.getContext('2d');
+const NT = 200, NZ = 200;
+const M = { l: 60, r: 20, t: 14, b: 48 };
+let cache = null;   // current curves, used by hover
+
+function blues(u) {   // 0..1 -> white..dark blue
+  u = Math.max(0, Math.min(1, u));
+  const a = [247, 251, 255], b = [8, 48, 107];
+  const m = [66, 146, 198];
+  const lerp = (x, y, f) => x + (y - x) * f;
+  const [c0, c1, f] = u < 0.5 ? [a, m, u*2] : [m, b, (u-0.5)*2];
+  return `rgb(${lerp(c0[0],c1[0],f)|0},${lerp(c0[1],c1[1],f)|0},${lerp(c0[2],c1[2],f)|0})`;
+}
+
+function draw() {
+  const { s, N, n, w, p, v0, tmax } = state;
+  const c = v0 * N * N;
+  const W = cv.width - M.l - M.r, H = cv.height - M.t - M.b;
+
+  const ts = [], mu = [], sd = [], ab = [];
+  for (let i = 0; i < NT; i++) {
+    const t = 1e-3 + (tmax - 1e-3) * i / (NT - 1);
+    const m = meanZ(t, s, n, w, p);
+    const maxVar = m * (1 - m);
+    let v = varZ(t, s, N, n, w, p, c);
+    v = Math.min(Math.max(v, 1e-10), maxVar * 0.9999);
+    const conc = maxVar / v - 1;
+    ts.push(t); mu.push(m); sd.push(Math.sqrt(v));
+    ab.push(m > 0 && m < 1 && conc > 0 ? [m * conc, (1 - m) * conc] : null);
+  }
+
+  // PDF grid, column by column
+  const grid = new Float32Array(NT * NZ);
+  const all = [];
+  for (let i = 0; i < NT; i++) {
+    if (!ab[i]) continue;
+    const [a, b] = ab[i];
+    const lnB = lgamma(a) + lgamma(b) - lgamma(a + b);
+    for (let j = 0; j < NZ; j++) {
+      const v = betaPdf((j + 0.5) / NZ, a, b, lnB);
+      const f = isFinite(v) ? v : 0;
+      grid[j*NT + i] = f;
+      all.push(f);
+    }
+  }
+  all.sort((x, y) => x - y);
+  const vmax = all.length ? Math.max(all[Math.floor(all.length * 0.99)], 1e-9) : 1;
+
+  ctx.clearRect(0, 0, cv.width, cv.height);
+  ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, cv.width, cv.height);
+  const cw = W / NT, ch = H / NZ;
+  for (let i = 0; i < NT; i++) {
+    for (let j = 0; j < NZ; j++) {
+      ctx.fillStyle = blues(grid[j*NT + i] / vmax);
+      ctx.fillRect(M.l + i*cw, M.t + H - (j+1)*ch, cw + 0.6, ch + 0.6);
+    }
+  }
+
+  const X = t => M.l + (t / tmax) * W;
+  const Y = z => M.t + H - z * H;
+
+  if (document.getElementById('showSD').checked) {
+    ctx.strokeStyle = 'rgba(23,23,23,.6)'; ctx.lineWidth = 1.5; ctx.setLineDash([6, 4]);
+    for (const sign of [1, -1]) {
+      ctx.beginPath();
+      for (let i = 0; i < NT; i++) {
+        const z = Math.min(1, Math.max(0, mu[i] + sign * 2 * sd[i]));
+        i ? ctx.lineTo(X(ts[i]), Y(z)) : ctx.moveTo(X(ts[i]), Y(z));
+      }
+      ctx.stroke();
+    }
+    ctx.setLineDash([]);
+  }
+
+  // axes
+  ctx.strokeStyle = '#333'; ctx.fillStyle = '#333'; ctx.lineWidth = 1; ctx.font = '13px system-ui';
+  ctx.strokeRect(M.l, M.t, W, H);
+  ctx.textAlign = 'center';
+  const tstep = tmax <= 30 ? 5 : tmax <= 60 ? 10 : 20;
+  for (let t = 0; t <= tmax; t += tstep) {
+    ctx.beginPath(); ctx.moveTo(X(t), M.t + H); ctx.lineTo(X(t), M.t + H + 5); ctx.stroke();
+    ctx.fillText(t, X(t), M.t + H + 18);
+  }
+  ctx.fillText('Age (years)', M.l + W/2, cv.height - 8);
+  ctx.textAlign = 'right';
+  for (let z = 0; z <= 1.001; z += 0.2) {
+    ctx.beginPath(); ctx.moveTo(M.l - 5, Y(z)); ctx.lineTo(M.l, Y(z)); ctx.stroke();
+    ctx.fillText(z.toFixed(1), M.l - 8, Y(z) + 4);
+  }
+  ctx.save(); ctx.translate(14, M.t + H/2); ctx.rotate(-Math.PI/2);
+  ctx.textAlign = 'center'; ctx.fillText('Z = M / N', 0, 0); ctx.restore();
+
+  cache = { ts, mu, sd, W, H, tmax };
+}
+
+cv.addEventListener('mousemove', e => {
+  if (!cache) return;
+  const r = cv.getBoundingClientRect();
+  const px = (e.clientX - r.left) * cv.width / r.width - M.l;
+  const out = document.getElementById('readout');
+  if (px < 0 || px > cache.W) { out.textContent = 'Hover over the plot to read values.'; return; }
+  const i = Math.round(px / cache.W * (NT - 1));
+  const m = cache.mu[i], d = cache.sd[i];
+  out.textContent = `Age ${cache.ts[i].toFixed(1)} y  |  mean Z = ${m.toFixed(3)}  |  ±2 SD: ${Math.max(0, m - 2*d).toFixed(3)} to ${Math.min(1, m + 2*d).toFixed(3)}`;
+});
+
+sync(); draw();
+</script>
+</body>
+</html>
