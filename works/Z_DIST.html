@@ -14,8 +14,10 @@
   .controls { flex: 0 0 300px; }
   .plot { flex: 1 1 480px; min-width: 0; }
   .ctl { margin-bottom: 12px; }
-  .ctl label { display: flex; justify-content: space-between; font-size: 13px; font-weight: 600; color: #333; }
-  .ctl label span { font-weight: 400; color: #3a6bc4; font-variant-numeric: tabular-nums; }
+  .ctl label { display: flex; justify-content: space-between; align-items: center; font-size: 13px; font-weight: 600; color: #333; }
+  .ctl input[type=number] { width: 88px; padding: 3px 6px; border: 1px solid #ccc; border-radius: 4px; font-size: 13px; color: #3a6bc4; text-align: right; font-variant-numeric: tabular-nums; }
+  .ctl input[type=number].bad { border-color: #c0392b; background: #fdecea; }
+  h3 { margin: 14px 0 8px; font-size: 13px; color: #666; text-transform: uppercase; letter-spacing: .04em; }
   .ctl small { display: block; font-size: 11px; color: #888; }
   input[type=range] { width: 100%; }
   button { padding: 6px 14px; border: 1px solid #aaa; background: white; cursor: pointer; border-radius: 4px; font-size: 13px; }
@@ -31,11 +33,13 @@
 <h2>Methylation Drift Explorer</h2>
 <p>Z is the fraction of stem cells that are methylated at one CpG site (Z = M / N). As stem cells divide, Z drifts toward a
   steady level (&eta;) and spreads out between people. The heatmap shows how likely each value of Z is at each age; darker means more likely.
-  Drag the sliders to see how each parameter changes it.</p>
+  Drag the sliders, or type any value into the boxes, to see how each parameter changes it.</p>
 
 <div class="layout">
   <div class="card controls">
     <div id="sliders"></div>
+    <h3>Display</h3>
+    <div id="display"></div>
     <label class="opt"><input type="checkbox" id="showSD" checked> Show &plusmn;2 SD</label>
     <button id="reset">Reset</button>
   </div>
@@ -81,49 +85,80 @@ const betaPdf = (z, a, b, lnB) => Math.exp((a-1)*Math.log(z) + (b-1)*Math.log(1-
 
 // ---- Controls ----
 // scale: 'lin' or 'log'; value shown via fmt
-const DEFAULTS = { s: 1, N: 10000, n: 0.2, w: 0.01, p: 0.001, v0: 0.001, tmax: 100 };
+const DEFAULTS = { s: 1, N: 10000, n: 0.2, w: 0.01, p: 0.001, v0: 0.001, tmax: 100, nt: 120, nz: 100 };
+// min/max = slider range; lo/hi = hard limits for typed values
 const SPEC = [
-  { k: 's',    label: 'Division rate (s)',            note: 'divisions per stem cell per year', min: 0.1,   max: 5,      step: 0.1 },
-  { k: 'N',    label: 'Stem cells (N)',               note: 'fewer cells = more random drift',  min: 100,   max: 1e6,    log: true },
-  { k: 'n',    label: 'Equilibrium methylation (η)',  note: 'level Z settles at after a long time', min: 0, max: 1,     step: 0.01 },
-  { k: 'w',    label: 'Switching rate (ω)',           note: 'how fast Z approaches η',          min: 0.001, max: 0.1,    log: true },
-  { k: 'p',    label: 'Initial methylation (p)',      note: 'average Z at birth',               min: 0,     max: 1,      step: 0.001 },
-  { k: 'v0',   label: 'Initial variance of Z',        note: 'person-to-person spread at birth', min: 0,     max: 0.05,   step: 0.0005 },
-  { k: 'tmax', label: 'Max age (years)',              note: '',                                 min: 10,    max: 120,    step: 1 },
+  { k: 's',    label: 'Division rate (s)',            note: 'divisions per stem cell per year', min: 0.1,   max: 5,    step: 0.1,    lo: 1e-6,  hi: 1e3 },
+  { k: 'N',    label: 'Stem cells (N)',               note: 'fewer cells = more random drift',  min: 100,   max: 1e6,  log: true,    lo: 1,     hi: 1e12 },
+  { k: 'n',    label: 'Equilibrium methylation (η)',  note: 'level Z settles at after a long time', min: 0, max: 1,    step: 0.01,   lo: 0,     hi: 1 },
+  { k: 'w',    label: 'Switching rate (ω)',           note: 'how fast Z approaches η',          min: 0.001, max: 0.1,  log: true,    lo: 1e-6,  hi: 1 },
+  { k: 'p',    label: 'Initial methylation (p)',      note: 'average Z at birth',               min: 0,     max: 1,    step: 0.001,  lo: 0,     hi: 1 },
+  { k: 'v0',   label: 'Initial variance of Z',        note: 'person-to-person spread at birth', min: 0,     max: 0.05, step: 0.0005, lo: 0,     hi: 0.25 },
+  { k: 'tmax', label: 'Max age (years)',              note: '',                                 min: 10,    max: 120,  step: 1,      lo: 1,     hi: 1000 },
+  { k: 'nt',   label: 'Age bins',                     note: 'columns in the heatmap',           min: 20,    max: 200,  step: 1,      lo: 10,    hi: 200, int: true, rebuild: true, panel: 'display' },
+  { k: 'nz',   label: 'Z bins',                       note: 'rows in the heatmap',              min: 20,    max: 200,  step: 1,      lo: 10,    hi: 200, int: true, rebuild: true, panel: 'display' },
 ];
 const state = { ...DEFAULTS };
 const inputs = {};
 
 function toSlider(sp, v) { return sp.log ? Math.log10(v) : v; }
 function fromSlider(sp, x) { return sp.log ? Math.pow(10, x) : x; }
-function fmt(sp, v) { return sp.log ? v.toPrecision(3) : (sp.step < 0.01 ? v.toFixed(4) : sp.step < 1 ? v.toFixed(2) : v.toFixed(0)); }
+const show4 = v => String(+v.toPrecision(4));
 
-const box = document.getElementById('sliders');
+function apply(sp) {
+  if (sp.rebuild) { NT = state.nt; NZ = state.nz; build(); }
+  sync(); draw();
+}
 for (const sp of SPEC) {
   const d = document.createElement('div');
   d.className = 'ctl';
-  d.innerHTML = `<label>${sp.label}<span></span></label><input type="range"><small>${sp.note}</small>`;
-  const r = d.querySelector('input');
+  d.innerHTML = `<label>${sp.label}<input type="number" step="any"></label><input type="range"><small>${sp.note}</small>`;
+  const num = d.querySelector('input[type=number]'), r = d.querySelector('input[type=range]');
   r.min = toSlider(sp, sp.min); r.max = toSlider(sp, sp.max);
   r.step = sp.log ? 0.01 : sp.step;
-  r.addEventListener('input', () => { state[sp.k] = fromSlider(sp, +r.value); sync(); draw(); });
-  inputs[sp.k] = { r, out: d.querySelector('span'), sp };
-  box.appendChild(d);
+  r.addEventListener('input', () => {
+    let v = fromSlider(sp, +r.value);
+    state[sp.k] = sp.int ? Math.round(v) : v;
+    apply(sp);
+  });
+  // typed value: apply live when valid, flag when out of range, clamp on commit
+  num.addEventListener('input', () => {
+    let v = parseFloat(num.value);
+    const ok = isFinite(v) && v >= sp.lo && v <= sp.hi;
+    num.classList.toggle('bad', !ok);
+    if (!ok) return;
+    state[sp.k] = sp.int ? Math.round(v) : v;
+    apply({ ...sp, _typing: true });
+  });
+  num.addEventListener('change', () => {
+    let v = parseFloat(num.value);
+    if (!isFinite(v)) v = state[sp.k];
+    v = Math.min(sp.hi, Math.max(sp.lo, v));
+    state[sp.k] = sp.int ? Math.round(v) : v;
+    num.classList.remove('bad');
+    apply(sp);
+  });
+  inputs[sp.k] = { r, num, sp };
+  document.getElementById(sp.panel || 'sliders').appendChild(d);
 }
 function sync() {
   for (const k in inputs) {
-    const { r, out, sp } = inputs[k];
+    const { r, num, sp } = inputs[k];
     r.value = toSlider(sp, state[k]);
-    out.textContent = fmt(sp, state[k]);
+    if (document.activeElement !== num) num.value = show4(state[k]);   // don't fight the user's typing
   }
 }
-document.getElementById('reset').onclick = () => { Object.assign(state, DEFAULTS); sync(); draw(); };
+document.getElementById('reset').onclick = () => {
+  Object.assign(state, DEFAULTS); NT = state.nt; NZ = state.nz;
+  for (const k in inputs) inputs[k].num.classList.remove('bad');
+  build(); sync(); draw();
+};
 document.getElementById('showSD').onchange = () => draw();
 
 // ---- Drawing (SVG) ----
 const cv = document.getElementById('cv');
 const NS = 'http://www.w3.org/2000/svg';
-const NT = 120, NZ = 100;
+let NT = DEFAULTS.nt, NZ = DEFAULTS.nz;
 let VW, VH, M, W, H, cells, sdUp, sdLo, tickG;
 let cache = null;   // current curves, used by hover
 
@@ -217,8 +252,9 @@ function draw() {
   }
 
   tickG.textContent = '';
-  const tstep = tmax <= 30 ? 5 : tmax <= 60 ? 10 : 20;
-  for (let t = 0; t <= tmax; t += tstep) {
+  const raw = tmax / (VW < 500 ? 5 : 8), pow = Math.pow(10, Math.floor(Math.log10(raw)));
+  const tstep = [1, 2, 5, 10].map(f => f * pow).find(v => v >= raw);
+  for (let t = 0; t <= tmax + 1e-9; t += tstep) {
     el('line', { x1: X(t), x2: X(t), y1: M.t + H, y2: M.t + H + 5, stroke: '#333' }, tickG);
     el('text', { x: X(t), y: M.t + H + 18, 'text-anchor': 'middle' }, tickG).textContent = t;
   }
